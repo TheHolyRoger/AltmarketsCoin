@@ -8,6 +8,7 @@ import argparse
 import os
 import subprocess
 import sys
+import fileinput
 
 def InstallGitianLXC():
     writeFiles = [{
@@ -69,6 +70,12 @@ def InstallVMBuilder():
     subprocess.call(['echo', 'sudo', 'python3', 'setup.py', 'install'])
     os.chdir(previousDir)
 
+def UpgradeGit():
+    subprocess.check_call('sudo apt-get install python-software-properties', shell=True)
+    subprocess.check_call('sudo add-apt-repository ppa:git-core/ppa', shell=True)
+    subprocess.check_call('sudo apt-get update', shell=True)
+    subprocess.check_call('sudo apt-get install git', shell=True)
+
 def setup():
     global args, workdir
     if not args.docker and not args.kvm:
@@ -82,7 +89,7 @@ def setup():
             PathsToClear += ['gitian-builder/inputs/AltmarketsCoin', 'gitian-builder/result/*', 'gitian-builder/var/*', 'gitian.sigs.altmarkets']
             PathsToClear += ['altmarkets-detached-sigs', 'altmarkets-binaries', 'AltmarketsCoin', 'gitian-builder/inputs/*-unsigned.tar.gz']
             PathsToClear = ' '.join(PathsToClear)
-            subprocess.check_call('rm -r '+PathsToClear, shell=True)
+            subprocess.check_call('rm -rf '+PathsToClear, shell=True)
         except:
             pass
     if args.kvm:
@@ -98,16 +105,32 @@ def setup():
             sys.exit(1)
     else:
         programs += ['apt-cacher-ng', 'lxc', 'debootstrap']
-        programs += ['python-cheetah', 'parted', 'kpartx', 'bridge-utils', 'ubuntu-archive-keyring', 'firewalld' ]
+        programs += ['python-cheetah', 'parted', 'kpartx', 'bridge-utils', 'firewalld' ]
     subprocess.check_call(['sudo', 'apt-get', 'install', '-qq'] + programs)
+    try:
+        subprocess.check_call(['sudo', 'apt-get', 'install', '-qq', 'ubuntu-archive-keyring'])
+    except Exception as e:
+        pass
     if not os.path.isdir('gitian.sigs.altmarkets'):
         subprocess.check_call(['git', 'clone', 'https://github.com/altmarkets/gitian.sigs.altmarkets.git'])
     if not os.path.isdir('altmarkets-detached-sigs'):
         subprocess.check_call(['git', 'clone', 'https://github.com/altmarkets/altmarkets-detached-sigs.git'])
     if not os.path.isdir('gitian-builder'):
         subprocess.check_call(['git', 'clone', 'https://github.com/devrandom/gitian-builder.git'])
+    if args.no_apt_proxy:
+        GBuilderReplace = 'MIRROR_BASE=http://${MIRROR_HOST:-$MIRROR_DEFAULT}:3142'
+        GBuilderPatch = '\n\nif [ $MIRROR_HOST = "no-cache" ]; then\n  MIRROR_BASE=https:/\nfi'
+        with fileinput.FileInput('gitian-builder/bin/make-base-vm', inplace=True, backup='.bak') as file:
+            for line in file:
+                if line.strip() == GBuilderReplace:
+                    print(line.replace(GBuilderReplace, GBuilderReplace + ' ## Patched. '), end='')
+                    print(GBuilderPatch)
+                else:
+                    print(line, end='')
     if not os.path.isdir('AltmarketsCoin'):
         subprocess.check_call(['git', 'clone', "%s.git" % (args.url)])
+    if args.upgrade_git:
+        UpgradeGit()
     os.chdir('gitian-builder')
     make_image_prog = ['bin/make-base-vm', '--suite', 'trusty', '--arch', 'amd64']
     if args.docker:
@@ -331,6 +354,8 @@ def main():
     parser.add_argument('-W', '--wipe-cache', action='store_true', dest='wipe_cache', help='Wipe all cached files.')
     parser.add_argument('--make-shasums', action='store_true', dest='make_shasums', help='Make SHA256 SUMs.')
     parser.add_argument('--install-vmbuilder', action='store_true', dest='install_vmbuilder', help='Install VM Builder.')
+    parser.add_argument('--no-apt-proxy', action='store_true', dest='no_apt_proxy', help='Don\'t use apt cacher proxy inside gitian build.')
+    parser.add_argument('--upgrade-git', action='store_true', dest='upgrade_git', help='Upgrade Git.')
     parser.add_argument('-d', '--docker', action='store_true', dest='docker', help='Use Docker instead of LXC')
     parser.add_argument('-S', '--setup', action='store_true', dest='setup', help='Set up the Gitian building environment. Only works on Debian-based systems (Ubuntu, Debian)')
     parser.add_argument('-D', '--detach-sign', action='store_true', dest='detach_sign', help='Create the assert file for detached signing. Will not commit anything.')
@@ -353,6 +378,7 @@ def main():
     os.environ['USE_DOCKER'] = ''
     if args.docker:
         os.environ['USE_DOCKER'] = '1'
+        os.environ['MIRROR_HOST'] = 'no-cache'
     elif not args.kvm:
         os.environ['USE_LXC'] = '1'
         if 'GITIAN_HOST_IP' not in os.environ.keys():
