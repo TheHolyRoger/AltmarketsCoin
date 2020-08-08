@@ -378,7 +378,8 @@ def main():
     os.environ['USE_DOCKER'] = ''
     if args.docker:
         os.environ['USE_DOCKER'] = '1'
-        os.environ['MIRROR_HOST'] = 'no-cache'
+        if args.no_apt_proxy:
+            os.environ['MIRROR_HOST'] = 'no-cache'
     elif not args.kvm:
         os.environ['USE_LXC'] = '1'
         if 'GITIAN_HOST_IP' not in os.environ.keys():
