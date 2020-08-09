@@ -200,7 +200,7 @@ def build():
         print('\nCompiling ' + args.version + ' MacOS')
         subprocess.check_call(['bin/gbuild', '-j', args.jobs, '-m', args.memory, '--commit', 'AltmarketsCoin='+args.commit, '--url', 'AltmarketsCoin='+args.url, '../AltmarketsCoin/contrib/gitian-descriptors/gitian-osx.yml'])
         subprocess.check_call(['bin/gsign', '-p', args.sign_prog, '--signer', args.signer, '--release', args.version+'-osx-unsigned', '--destination', '../gitian.sigs.altmarkets/', '../AltmarketsCoin/contrib/gitian-descriptors/gitian-osx.yml'])
-        subprocess.check_call('mv build/out/altmarkets-*-osx-unsigned.tar.gz inputs/altmarkets-osx-unsigned.tar.gz', shell=True)
+        subprocess.check_call('mv build/out/altmarkets-*-osx-unsigned.tar.gz inputs/Altmarkets-osx-unsigned.tar.gz', shell=True)
         subprocess.check_call('mv build/out/altmarkets-*.tar.gz build/out/altmarkets-*.dmg build/out/src/altmarkets-*.tar.gz ../altmarkets-binaries/'+args.version + '/mac', shell=True)
         try:
             subprocess.check_call('mv var/install.log var/install_mac.log', shell=True)
@@ -249,7 +249,7 @@ def sign():
         except:
             pass
         try:
-            subprocess.check_call('mv build/out/altmarkets-osx-signed.dmg ../altmarkets-binaries/' + args.version + '/mac' + '/altmarkets-'+args.version+'-osx.dmg', shell=True)
+            subprocess.check_call('mv build/out/Altmarkets-osx-signed.dmg ../altmarkets-binaries/' + args.version + '/mac' + '/Altmarkets-'+args.version+'-osx.dmg', shell=True)
         except Exception as e:
             print(e)
             pass
